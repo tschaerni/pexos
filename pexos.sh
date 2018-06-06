@@ -24,6 +24,7 @@ TFTPIP="192.168.50.2"
 TFTPDIR="/pxeboot/tftpboot"
 PXECONFDIR="$TFTPDIR/pxelinux.cfg"
 ISOMOUNTDIR="/pxeboot/nfsroot"
+TEMPLATEDIR="$PXELINUXCONFDIR/templates"
 
 IMAGEPATH="$2"						# i.e: /path/imagename.iso
 IMAGEFILENAME="${IMAGEPATH##*/}"	# i.e: imagename.iso
@@ -114,12 +115,15 @@ identify_distro(){
 	case "$1" in
 		*linuxmint*)
 			DISTRO="linuxmint"
+			TEMPLATE="$TEMPLATEDIR/linuxmint_pxe_template.cfg"
 			;;
 		*ubuntu*)
 			DISTRO="ubuntu"
+			TEMPLATE="$TEMPLATEDIR/ubuntu_pxe_template.cfg"
 			;;
 		*debian*)
 			DISTRO="debian"
+			TEMPLATE="$TEMPLATEDIR/debian_pxe_template.cfg"
 			;;
 		*)
 			status_message "can't identify linux distro / or given distro isn't supported yet" "fail"
@@ -238,91 +242,21 @@ remove_kernelfiles(){
 	fi
 }
 
-generate_pxeconfig_linuxmint(){
-cat > "$PXECONF" << EOF
-menu title Welcome to Linux Mint $GUIFLAVOR $ARCH
-
-label live
-	menu label Start Linux Mint
-	kernel $KERNEL
-	APPEND root=/dev/nfs boot=casper netboot=nfs nfsroot=$NFSROOT initrd=$INITRD --
-	menu default
-label xforcevesa
-	menu label Start in compatibility mode
-	kernel $KERNEL
-	append root=/dev/nfs nfsroot=$NFSROOT netboot=nfs boot=casper xforcevesa nomodeset b43.blacklist=yes initrd=$INITRD root=/dev/ram rw noapic noacpi nosplash irqpoll --
-label forcepaeoption
-	menu label Start with PAE forced
-	kernel $KERNEL
-	append  root=/dev/nfs boot=casper netboot=nfs nfsroot=$NFSROOT initrd=$INITRD -- forcepae
-label oem
-	menu label OEM install (for manufacturers)
-	kernel $KERNEL
-	append  root=/dev/nfs boot=casper netboot=nfs nfsroot=$NFSROOT initrd=$INITRD oem-config/enable=true only-ubiquity --
-EOF
-return $?
-}
-
-generate_pxeconfig_ubuntu(){
-cat > "$PXECONF" << EOF
-menu title Welcome to Ubuntu $GUIFLAVOR $ARCH
-
-label live
-	menu label Start Ubuntu
-	kernel $KERNEL
-	APPEND root=/dev/nfs boot=casper netboot=nfs nfsroot=$NFSROOT initrd=$INITRD --
-	menu default
-label live-install
-	menu label Start Ubuntu (only installer)
-	kernel $KERNEL
-	APPEND root=/dev/nfs boot=casper netboot=nfs nfsroot=$NFSROOT only-ubiquity initrd=$INITRD --
-	menu default
-label xforcevesa
-	menu label Start in compatibility mode
-	kernel $KERNEL
-	append root=/dev/nfs nfsroot=$NFSROOT netboot=nfs boot=casper xforcevesa nomodeset b43.blacklist=yes initrd=$INITRD root=/dev/ram rw noapic noacpi nosplash irqpoll --
-label forcepaeoption
-	menu label Start with PAE forced
-	kernel $KERNEL
-	append  root=/dev/nfs boot=casper netboot=nfs nfsroot=$NFSROOT initrd=$INITRD -- forcepae
-label oem
-	menu label OEM install (for manufacturers)
-	kernel $KERNEL
-	append  root=/dev/nfs boot=casper netboot=nfs nfsroot=$NFSROOT initrd=$INITRD oem-config/enable=true only-ubiquity --
-EOF
-return $?
-}
-
-generate_pxeconfig_debian(){
-cat > "$PXECONF" << EOF
-menu title Welcome to debian $GUIFLAVOR $ARCH
-
-label live
-	menu label Start debian
-	kernel $KERNEL
-	APPEND root=/dev/nfs boot=live netboot=nfs nfsroot=$NFSROOT initrd=$INITRD components locales=de_CH.UTF-8 --
-	menu default
-label live-install
-	menu label Start debian (only installer)
-	kernel $KERNEL
-	APPEND root=/dev/nfs boot=live netboot=nfs nfsroot=$NFSROOT only-ubiquity initrd=$INITRD components locales=de_CH.UTF-8 --
-	menu default
-EOF
-return $?
-}
-
 generate_pxeconfig(){
-	case "$DISTRO" in
-		debian)
-			generate_pxeconfig_debian
-			;;
-		linuxmint)
-			generate_pxeconfig_linuxmint
-			;;
-		ubuntu)
-			generate_pxeconfig_ubuntu
-			;;
-	esac
+	sed -e "/#.*$/d" \
+			-e "s/GUIFLAVOR/${GUIFLAVOR//\//\\/}/g" \
+			-e "s/ARCH/${ARCH//\//\\/}/g" \
+			-e "s/KERNELFILE/${KERNEL//\//\\/}/g" \
+			-e "s/INITRDFILE/${INITRD//\//\\/}/g" \
+			-e "s/NFSROOT/${NFSROOT//\//\\/}/g" \
+			"$TEMPLATE" > "$PXECONF"
+	if [[ "$?" = "0" ]]
+	then
+		status_message "generating pxeconfig $PXECONF" "done"
+	else
+		status_message "generating pxeconfig $PXECONF" "fail"
+		exit 1
+	fi
 }
 
 remove_pxeconfig(){
