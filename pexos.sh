@@ -36,17 +36,13 @@
 #===============================================================================
 
 
-FSTAB="/etc/fstab"
-ISODIR="/pxeboot/images"
-TFTPIP="192.168.50.2"
-TFTPDIR="/pxeboot/tftpboot"
-PXECONFDIR="$TFTPDIR/pxelinux.cfg"
-ISOMOUNTDIR="/pxeboot/nfsroot"
-TEMPLATEDIR="$PXELINUXCONFDIR/templates"
+# read configfile
+# todo: dir finding, basenamestuff etc...
+source "pexos.cfg"
 
-IMAGEPATH="$2"						# i.e: /path/imagename.iso
-IMAGEFILENAME="${IMAGEPATH##*/}"	# i.e: imagename.iso
-IMAGENAME="${IMAGEFILENAME%.*}"		# i.e: imagename
+IMAGEPATH="$2"								# i.e: /path/imagename.iso
+IMAGEFILENAME="${IMAGEPATH##*/}"			# i.e: imagename.iso
+IMAGENAME="${IMAGEFILENAME%.*}"				# i.e: imagename
 
 
 status_message(){
@@ -58,12 +54,19 @@ status_message(){
 #
 #	known bug: if the message is longer than the terminals width the output is fucked up
 #
+	# colors
+	RESET="\e[0m"
+	RED="\e[31m"
+	GREEN="\e[32m"
+	ORANGE="\e[33m"
+
 	MSG="$1"
 	MSGLENGTH="${#MSG}"
 	TERMCOLS="$(tput cols)"
-	OKMSG="[  \e[32mOK\e[0m  ]"
-	DONEMSG="[ \e[32mDONE\e[0m ]"
-	FAILMSG="[ \e[31mFAIL\e[0m ]"
+	OKMSG="[  ${GREEN}OK${RESET}  ]"
+	DONEMSG="[ ${GREEN}DONE${RESET} ]"
+	FAILMSG="[ ${RED}FAIL${RESET} ]"
+	WARNMSG="[ ${ORANGE}WARN${RESET} ]"
 	MVCURSOR="$(( TERMCOLS - 10 ))"
 
 	case "$2" in
@@ -72,6 +75,9 @@ status_message(){
 			;;
 		"done")
 			STATUSMSG="$DONEMSG"
+			;;
+		"warn")
+			STATUSMSG="$WARNMSG"
 			;;
 		"fail")
 			STATUSMSG="$FAILMSG"
@@ -108,12 +114,12 @@ check_dir(){
 					exit 1
 			fi
 	else
-			if $(mkdir -p "$DIR" 2> /dev/null)
+			if RETURNMSG="$(mkdir -p "$DIR" 2>&1)"
 			then
 					status_message "check directory $DIR" "ok"
 			else
 					status_message "check directory $DIR" "fail"
-					echo "error: could not create $DIR"
+					echo "error: $RETURNMESSAGE"
 					exit 1
 			fi
 	fi
@@ -121,11 +127,13 @@ check_dir(){
 
 check_cp(){
 	cp "$1" "$2"
-	if [[ "$?" = "0" ]]
+	if RETURNMSG="$(cp $1 $2 2>&1)"
 	then
 		status_message "copying file $1 to $2" "done"
 	else
 		status_message "copying file $1 to $2" "fail"
+		echo "error: $RETURNMSG"
+		exit 1
 	fi
 }
 
@@ -192,7 +200,6 @@ identify_distro(){
 
 	status_message "image identified: $DISTRO $ARCH $GUIFLAVOR" "done"
 
-
 	PXECONF="$PXECONFDIR/$DISTRO/$IMAGENAME.cfg"
 	ISO="$ISODIR/$DISTRO/$IMAGEFILENAME"
 	ISOMOUNT="$ISOMOUNTDIR/$DISTRO/$IMAGENAME"
@@ -205,12 +212,12 @@ identify_distro(){
 }
 
 check_directories(){
-	check_dir "$ISODIR/$DISTRO"
 	check_dir "$PXECONFDIR/$DISTRO"
-	check_dir "$ISOMOUNT"
 }
 
 move_imagefile(){
+	check_dir "$ISODIR/$DISTRO"
+
 	if ! [[ -f "$ISO" ]]
 	then
 		mv "$IMAGEPATH" "$ISO"
@@ -277,6 +284,23 @@ generate_pxeconfig(){
 	fi
 }
 
+generate_pxemenu(){
+#	usage: generate_pxemenu <arg1>
+#	arg1: distroname {debian|ubuntu|linuxmint}
+	PXEMENU="$PXECONFDIR/$1/${1}_menu.cfg"
+#	find config files of distro <arg1> and sort them in humanreadable order and reverse
+#	(with that the newer versions of the same iso will be on top)
+	cat $(find "$PXECONFDIR/$1" -type f -name "*.cfg" | egrep -v "*_menu.cfg" | sort -hr) > "$PXEMENU"
+	if [[ "$?" = "0" ]]
+	then
+		status_message "generating $PXEMENU" "done"
+	else
+		status_message "generating $PXEMENU" "fail"
+		echo "error: generating $PXEMENU"
+		exit 1
+	fi
+}
+
 remove_pxeconfig(){
 	if RETURNMSG="$(rm $PXECONF 2>&1)"
 	then
@@ -284,10 +308,13 @@ remove_pxeconfig(){
 	else
 		status_message "removing $PXECONF" "fail"
 		echo "error: $RETURNMSG"
+		exit 1
 	fi
 }
 
 add_fstab(){
+	check_dir "$ISOMOUNT"
+
 	if grep "$IMAGEFILENAME" "$FSTAB" > /dev/null 2>&1
 	then
 		status_message "found existing fstab entry for $IMAGEFILENAME" "fail"
@@ -371,6 +398,8 @@ case "$1" in
 		copy_kernelfiles
 		sleep 0.2
 		generate_pxeconfig
+		sleep 0.2
+		generate_pxemenu "$DISTRO"
 		;;
 	remove)
 		check_isoimage
@@ -385,6 +414,8 @@ case "$1" in
 		sleep 0.2
 		remove_kernelfiles
 		sleep 0.2
+		generate_pxemenu "$DISTRO
+		sleep 0.2"
 		echo "I don't remove images atm, you have to do it your self ;)"
 		echo ""
 		sleep 2
