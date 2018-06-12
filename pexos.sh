@@ -35,11 +35,25 @@
 #    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #===============================================================================
 
+# Settings:
 
-# read configfile
-# todo: dir finding, basenamestuff etc...
-source "pexos.cfg"
+# your fstab file
+FSTAB="/etc/fstab"
+# storage of your iso images
+ISODIR="/pxeboot/images"
+# the local IP address of your TFTP and NFS Server (atm. no support for separate hosts)
+TFTPIP="192.168.50.2"
+# tftp root directory
+TFTPDIR="/pxeboot/tftpboot"
+# the pxelinux config directory, inside are the configs for the pxelinux bootloader
+PXECONFDIR="$TFTPDIR/pxelinux.cfg"
+# mount directories for the iso images and are also exported through NFS
+ISOMOUNTDIR="/pxeboot/nfsroot"
+# template directory for pxeconfigs (used by this script), they can be modified to your liking
+TEMPLATEDIR="$PXELINUXCONFDIR/pexos/templates"
+#===============================================================================
 
+# env vars
 IMAGEPATH="$2"								# i.e: /path/imagename.iso
 IMAGEFILENAME="${IMAGEPATH##*/}"			# i.e: imagename.iso
 IMAGENAME="${IMAGEFILENAME%.*}"				# i.e: imagename
