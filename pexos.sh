@@ -90,6 +90,10 @@ status_message(){
 	echo -e "$STATUSMSG"
 }
 
+download_image(){
+	echo "not implemented"
+}
+
 check_isoimage(){
 	if [[ "${IMAGEFILENAME##*.}" = "iso" ]]
 	then
@@ -142,14 +146,20 @@ identify_distro(){
 		*linuxmint*)
 			DISTRO="linuxmint"
 			TEMPLATE="$TEMPLATEDIR/linuxmint_pxe_template.cfg"
+			KERNELFILE="vmlinuz"
+			INITRDFILE="initrd.lz"
 			;;
 		*ubuntu*)
 			DISTRO="ubuntu"
 			TEMPLATE="$TEMPLATEDIR/ubuntu_pxe_template.cfg"
+			KERNELFILE="vmlinuz"
+			INITRDFILE="initrd.lz"
 			;;
 		*debian*)
 			DISTRO="debian"
 			TEMPLATE="$TEMPLATEDIR/debian_pxe_template.cfg"
+			KERNELFILE="vmlinuz"
+			INITRDFILE="initrd.img"
 			;;
 		*)
 			status_message "can't identify linux distro / or given distro isn't supported yet" "fail"
@@ -206,8 +216,8 @@ identify_distro(){
 	KERNELDIR="$TFTPDIR/$DISTRO/$IMAGENAME"
 	INITRDDIR="$TFTPDIR/$DISTRO/$IMAGENAME"
 
-	KERNEL="::/$DISTRO/$IMAGENAME/vmlinuz"
-	INITRD="::/$DISTRO/$IMAGENAME/initrd.lz"
+	KERNEL="::/$DISTRO/$IMAGENAME/$KERNELFILE"
+	INITRD="::/$DISTRO/$IMAGENAME/$INITRDFILE"
 	NFSROOT="$TFTPIP:$ISOMOUNT"
 }
 
@@ -380,7 +390,6 @@ mount_image(){
 }
 
 # for fstab deletion: sed '/debian-live-.*-amasdasdd64-xfce.iso/d' /etc/fstab
-#generate_config
 case "$1" in
 	add)
 		check_isoimage
@@ -414,12 +423,22 @@ case "$1" in
 		sleep 0.2
 		remove_kernelfiles
 		sleep 0.2
-		generate_pxemenu "$DISTRO
-		sleep 0.2"
+		generate_pxemenu "$DISTRO"
+		sleep 0.2
 		echo "I don't remove images atm, you have to do it your self ;)"
 		echo ""
 		sleep 2
 		echo "I'm done"
+		;;
+	genmenu)
+		case "$2" in
+			debian|ubuntu|linuxmint)
+				generate_pxemenu "$2"
+				;;
+			*)
+				echo "not a valid distro"
+			;;
+		esac
 		;;
 	help|-h)
 		echo "ask Robin"
