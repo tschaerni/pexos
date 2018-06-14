@@ -230,6 +230,7 @@ identify_distro(){
 	KERNELDIR="$TFTPDIR/$DISTRO/$IMAGENAME"
 	INITRDDIR="$TFTPDIR/$DISTRO/$IMAGENAME"
 
+	ISOVERSION=$(echo $IMAGENAME  | grep -Eo '[1-9]{1,2}\.[0-9]{1,2}(\.[0-9]{1,2})?')
 	KERNEL="::/$DISTRO/$IMAGENAME/$KERNELFILE"
 	INITRD="::/$DISTRO/$IMAGENAME/$INITRDFILE"
 	NFSROOT="$TFTPIP:$ISOMOUNT"
@@ -293,8 +294,9 @@ remove_kernelfiles(){
 
 generate_pxeconfig(){
 	sed -e "/#.*$/d" \
-			-e "s/GUIFLAVOR/${GUIFLAVOR//\//\\/}/g" \
-			-e "s/ARCH/${ARCH//\//\\/}/g" \
+			-e "s/GUIFLAVOR/${GUIFLAVOR}/g" \
+			-e "s/ARCH/${ARCH}/g" \
+			-e "s/ISOVERSION/${ISOVERSION}/g" \
 			-e "s/KERNELFILE/${KERNEL//\//\\/}/g" \
 			-e "s/INITRDFILE/${INITRD//\//\\/}/g" \
 			-e "s/NFSROOT/${NFSROOT//\//\\/}/g" \
