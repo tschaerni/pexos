@@ -35,6 +35,11 @@
 #    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #===============================================================================
 
+SCRIPT_NAME="pexos"
+SCRIPT_VERSION="0.1"
+SCRIPT_AUTHOR="rcerny"
+SCRIPT_URL="https://github.com/tschaerni/pexos"
+
 # Settings:
 
 # your fstab file
@@ -54,10 +59,6 @@ TEMPLATEDIR="$PXELINUXCONFDIR/pexos/templates"
 #===============================================================================
 
 # env vars
-IMAGEPATH="$2"								# i.e: /path/imagename.iso
-IMAGEFILENAME="${IMAGEPATH##*/}"			# i.e: imagename.iso
-IMAGENAME="${IMAGEFILENAME%.*}"				# i.e: imagename
-
 
 status_message(){
 #
@@ -104,11 +105,36 @@ status_message(){
 	echo -e "$STATUSMSG"
 }
 
+usage(){
+	echo
+	echo "-------"
+	echo -e "Name    : $SCRIPT_NAME\nVersion : $SCRIPT_VERSION\nAuthor  : $SCRIPT_AUTHOR"
+	echo ""
+	echo -e "[USAGE]\n"
+	echo -e "  help, -h, --help                  print this help message \n"
+	echo -e "  version, -v, --version            print program version\n"
+	echo -e "  add </path/to/filename.iso>       add ISO image to the PXE environment\n"
+	echo -e "  remove <filename.iso>             remove specific ISO image\n"
+	echo -e "  genmenu <distro>                  generate menu entries for <distro>\n"
+	echo; echo;
+	echo -e "More information on : $SCRIPT_URL"
+	echo "-------"
+	echo
+}
+
+show_version(){
+	echo -e "$SCRIPT_NAME\nVersion : $SCRIPT_VERSION\n"
+}
+
 download_image(){
 	echo "not implemented"
 }
 
 check_isoimage(){
+	IMAGEPATH="$1"								# i.e: /path/imagename.iso
+	IMAGEFILENAME="${IMAGEPATH##*/}"			# i.e: imagename.iso
+	IMAGENAME="${IMAGEFILENAME%.*}"				# i.e: imagename
+
 	if [[ "${IMAGEFILENAME##*.}" = "iso" ]]
 	then
 		status_message "validate imagefile" "ok"
@@ -144,7 +170,7 @@ check_dir(){
 }
 
 check_cp(){
-	cp "$1" "$2"
+#	cp "$1" "$2"
 	if RETURNMSG="$(cp $1 $2 2>&1)"
 	then
 		status_message "copying file $1 to $2" "done"
@@ -222,18 +248,17 @@ identify_distro(){
 			;;
 	esac
 
-	status_message "image identified: $DISTRO $ARCH $GUIFLAVOR" "done"
-
 	PXECONF="$PXECONFDIR/$DISTRO/$IMAGENAME.cfg"
 	ISO="$ISODIR/$DISTRO/$IMAGEFILENAME"
 	ISOMOUNT="$ISOMOUNTDIR/$DISTRO/$IMAGENAME"
 	KERNELDIR="$TFTPDIR/$DISTRO/$IMAGENAME"
 	INITRDDIR="$TFTPDIR/$DISTRO/$IMAGENAME"
 
-	ISOVERSION=$(echo $IMAGENAME  | grep -Eo '[0-9]{1,2}\.[0-9]{1,2}(\.[0-9]{1,2})?')
+	ISOVERSION=$(echo $IMAGENAME | grep -Eo '[0-9]{1,2}\.[0-9]{1,2}(\.[0-9]{1,2})?')
 	KERNEL="::/$DISTRO/$IMAGENAME/$KERNELFILE"
 	INITRD="::/$DISTRO/$IMAGENAME/$INITRDFILE"
 	NFSROOT="$TFTPIP:$ISOMOUNT"
+	status_message "image identified: $DISTRO $ISOVERSION $ARCH $GUIFLAVOR" "done"
 }
 
 check_directories(){
@@ -405,10 +430,10 @@ mount_image(){
 	esac
 }
 
-# for fstab deletion: sed '/debian-live-.*-amasdasdd64-xfce.iso/d' /etc/fstab
 case "$1" in
 	add)
-		check_isoimage
+		shift
+		check_isoimage "$1"
 		sleep 0.2
 		identify_distro "$IMAGEFILENAME"
 		sleep 0.2
@@ -427,7 +452,8 @@ case "$1" in
 		generate_pxemenu "$DISTRO"
 		;;
 	remove)
-		check_isoimage
+		shift
+		check_isoimage "$1"
 		sleep 0.2
 		identify_distro "$IMAGEFILENAME"
 		sleep 0.2
@@ -447,20 +473,22 @@ case "$1" in
 		echo "I'm done"
 		;;
 	genmenu)
-		case "$2" in
+		shift
+		case "$1" in
 			debian|ubuntu|linuxmint)
-				generate_pxemenu "$2"
+				generate_pxemenu "$1"
 				;;
 			*)
 				echo "not a valid distro"
 			;;
 		esac
 		;;
-	help|-h)
-		echo "ask Robin"
+	help|--help|-h)
+		usage
 		;;
 	*)
-		echo "not implemented"
+		usage
+		exit 1
 		;;
 esac
 
